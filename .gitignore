@@ -1,0 +1,6 @@
+# Config y secretos por máquina: nunca al repo.
+host.env
+*.local
+*.secret
+secrets/
+.scratch/

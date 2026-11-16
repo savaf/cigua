@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "/usr/local/bin/cigua-notify", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

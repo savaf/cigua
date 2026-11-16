@@ -1,0 +1,14 @@
+# Gestionado por el repo cigua (files/systemd-user/ssh-agent.service).
+# Agente SSH con la llave de la máquina; socket en $XDG_RUNTIME_DIR/ssh-agent.socket
+# (exportado en ~/.zshenv por el módulo git-key).
+[Unit]
+Description=ssh-agent con la llave de la máquina (cigua)
+
+[Service]
+Type=simple
+ExecStartPre=/bin/rm -f %t/ssh-agent.socket
+ExecStart=/bin/sh -c 'ssh-agent -D -a %t/ssh-agent.socket & pid=$$!; sleep 1; SSH_AUTH_SOCK=%t/ssh-agent.socket ssh-add -q %h/.ssh/@KEY@; wait $$pid'
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

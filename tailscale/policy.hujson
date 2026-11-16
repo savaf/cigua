@@ -1,0 +1,25 @@
+// Política de la tailnet. Pégala en la consola de Tailscale → Access controls.
+// Reemplaza la regla por defecto (todos con todos). Ver docs/tailscale.md.
+{
+  "tagOwners": {
+    // Solo los admins de la tailnet pueden marcar un equipo como servidor.
+    "tag:server": ["autogroup:admin"],
+  },
+
+  "acls": [
+    // Tus dispositivos (ANDREA, Songbird, el teléfono) se hablan entre sí: SSH, Taildrop.
+    {"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]},
+
+    // y entran al VPS solo por SSH.
+    // Si expones algo más por la tailnet (un relay, una web interna), añade su puerto aquí.
+    {"action": "accept", "src": ["autogroup:member"], "dst": ["tag:server:22"]},
+
+    // Lo que NO hay: ninguna regla con src tag:server. El VPS no puede abrir conexiones
+    // hacia tus PCs; si un agente o un paquete lo compromete, no tiene camino a ellas.
+  ],
+
+  // Prueba la política antes de guardar: la consola rechaza el cambio si algo falla.
+  "tests": [
+    {"src": "autogroup:member", "accept": ["tag:server:22"], "deny": ["tag:server:80"]},
+  ],
+}

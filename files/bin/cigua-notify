@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Hook Notification de Claude Code: manda "repo: mensaje" a ntfy cuando un agente
+# espera respuesta o pide permiso. Instalado por el módulo claude-managed.
+# Nunca falla ni bloquea a Claude: cualquier error termina en exit 0.
+set -uo pipefail
+
+conf="${XDG_CONFIG_HOME:-${HOME}/.config}/cigua/notify.env"
+[[ -r "${conf}" ]] || exit 0
+# shellcheck source=/dev/null
+source "${conf}"
+[[ -n "${NTFY_URL:-}" ]] || exit 0
+
+payload="$(cat)"
+msg="$(jq -r '"\((.cwd // "") | split("/") | last): \(.message // "un agente espera respuesta")"' \
+  <<<"${payload}" 2>/dev/null)" || msg="un agente espera respuesta"
+
+auth=()
+[[ -n "${NTFY_TOKEN:-}" ]] && auth=(-H "Authorization: Bearer ${NTFY_TOKEN}")
+
+curl -fsS -m 5 "${auth[@]}" \
+  -H "Title: $(hostname -s)" \
+  -H "Tags: robot" \
+  -d "${msg}" "${NTFY_URL}" >/dev/null 2>&1 || true
+exit 0

@@ -1,0 +1,6 @@
+# Repos que viven en el VPS: "<ruta relativa a $HOME> <url git>".
+# Usa las mismas rutas que en ANDREA/Songbird para que `hw` y /horde no cambien.
+# Antes de añadir repos de trabajo (URBN, CNC), confirma que tu contrato permite
+# tenerlos en un servidor personal.
+#
+# Projects/cobroly            git@github.com:savaf/cobroly.git

@@ -1,0 +1,5 @@
+# lib/ y modules/ se cargan con source: no llevan shebang.
+shell=bash
+source-path=SCRIPTDIR
+# SC1090/SC1091: source con rutas dinámicas o fuera del repo.
+disable=SC1090,SC1091
