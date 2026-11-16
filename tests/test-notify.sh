@@ -16,7 +16,7 @@ EOF
 chmod +x "${work}/bin/curl"
 export CURL_LOG="${work}/curl.log" XDG_CONFIG_HOME="${work}/cfg" PATH="${work}/bin:${PATH}"
 
-event='{"cwd":"/home/savaf/Projects/cobroly","message":"Claude needs your permission to use Bash"}'
+event='{"cwd":"/home/user/Projects/proyecto","message":"Claude needs your permission to use Bash"}'
 send() { printf '%s' "$1" | "${hook}"; }
 
 echo "cigua-notify"
@@ -25,7 +25,7 @@ refute "sin config: no llama a curl" test -f "${CURL_LOG}"
 
 printf 'NTFY_URL=https://ntfy.example/agentes\nNTFY_TOKEN=tk_prueba\n' >"${work}/cfg/cigua/notify.env"
 check "con config: sale 0" send "${event}"
-check "mensaje 'repo: texto'" grep -qx 'cobroly: Claude needs your permission to use Bash' "${CURL_LOG}"
+check "mensaje 'repo: texto'" grep -qx 'proyecto: Claude needs your permission to use Bash' "${CURL_LOG}"
 check "manda el token" grep -qx 'Authorization: Bearer tk_prueba' "${CURL_LOG}"
 check "usa NTFY_URL" grep -qx 'https://ntfy.example/agentes' "${CURL_LOG}"
 
