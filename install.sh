@@ -98,14 +98,30 @@ show_pubkey() {
     "$(basename "$1" _ed25519.pub)" "$(cat "$1")"
 }
 
+# Valor de una variable de un host.env existente (vacío si no está). Se lee en un subshell
+# porque host.env es shell; lo generó este instalador, en modo 600.
+host_env_value() {
+  [[ -r "$1" ]] || return 0
+  ( set +u; source "$1" >/dev/null 2>&1; printf '%s' "${!2:-}" )
+}
+
 main() {
   [[ "${EUID}" -eq 0 ]] || fail "corre como root: curl … | sudo bash"
   command -v apt-get >/dev/null || fail "pensado para Ubuntu/Debian"
 
-  ask VPS_USER "Usuario de trabajo" cigua
-  ask AUTHORIZED_KEYS_URLS "URLs de llaves públicas (https, separadas por espacio)" "${DEFAULT_KEYS}"
-  ask VPS_HOSTNAME "Hostname" cigua
-  export VPS_USER AUTHORIZED_KEYS_URLS VPS_HOSTNAME
+  if [[ -e "${CIGUA_DIR}/host.env" ]]; then
+    # host.env manda: no se pregunta lo que luego se ignoraría, y el resumen usa sus valores.
+    say "host.env ya existe: uso su usuario y hostname (bórralo para regenerarlo)"
+    VPS_USER="$(host_env_value "${CIGUA_DIR}/host.env" VPS_USER)"
+    VPS_HOSTNAME="$(host_env_value "${CIGUA_DIR}/host.env" VPS_HOSTNAME)"
+    [[ -n "${VPS_USER}" && -n "${VPS_HOSTNAME}" ]] || fail "host.env no define VPS_USER y VPS_HOSTNAME"
+    export VPS_USER VPS_HOSTNAME
+  else
+    ask VPS_USER "Usuario de trabajo" cigua
+    ask AUTHORIZED_KEYS_URLS "URLs de llaves públicas (https, separadas por espacio)" "${DEFAULT_KEYS}"
+    ask VPS_HOSTNAME "Hostname" cigua
+    export VPS_USER AUTHORIZED_KEYS_URLS VPS_HOSTNAME
+  fi
 
   DEBIAN_FRONTEND=noninteractive apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl ca-certificates >/dev/null

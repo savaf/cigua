@@ -3,13 +3,20 @@
 
 BASE_PACKAGES=(git curl jq ufw ca-certificates unattended-upgrades)
 
+APT_UPGRADE_MARKER="${APT_UPGRADE_MARKER:-/var/lib/cigua/apt-upgraded}"
+
+should_apt_upgrade() { [[ "${APT_UPGRADE:-0}" == 1 || ! -e "${APT_UPGRADE_MARKER}" ]]; }
+
 run_base() {
-  # Parches antes que nada. force-confold conserva tus configs; sin preguntas ni reinicio.
-  log "apt: actualizando Ubuntu (puede tardar unos minutos)"
-  DEBIAN_FRONTEND=noninteractive apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Options::=--force-confold upgrade
   log "apt: actualizando índices e instalando ${BASE_PACKAGES[*]}"
   DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  # Parches antes que nada, pero solo la primera vez: repetirlo reiniciaría dockerd o tailscaled
+  # en medio de una sesión. APT_UPGRADE=1 lo fuerza. force-confold conserva tus configs.
+  if should_apt_upgrade; then
+    log "apt: actualizando Ubuntu (puede tardar unos minutos)"
+    DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Options::=--force-confold upgrade
+    install -d "$(dirname "${APT_UPGRADE_MARKER}")" && touch "${APT_UPGRADE_MARKER}"
+  fi
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${BASE_PACKAGES[@]}"
 
   if [[ "$(hostnamectl --static 2>/dev/null)" != "${VPS_HOSTNAME}" ]]; then
