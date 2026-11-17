@@ -19,6 +19,8 @@ EOF
 chmod +x "${work}/bin/"*
 export PATH="${work}/bin:${PATH}" UFW_LOG="${work}/ufw.log"
 VPS_HOSTNAME=cigua
+# Estos tests cubren la guarda de SSH_PUBLIC=0; SSH_PUBLIC=1 (el defecto) tiene su sección al final.
+export SSH_PUBLIC=0
 # Determinista: "es una consola real" lo decide FAKE_CONSOLE, no la tty del test.
 is_console_tty() { [[ "${FAKE_CONSOLE:-0}" == 1 ]]; }
 
@@ -81,5 +83,19 @@ check "PUBLIC_TCP_PORTS vacío: se borran 80 y 443" bash -c "grep -qx 'delete al
 PUBLIC_TCP_PORTS="80 443" run_from 100.101.1.2
 check "PUBLIC_TCP_PORTS abre 80" grep -q '^allow 80/tcp' "${UFW_LOG}"
 check "PUBLIC_TCP_PORTS abre 443" grep -q '^allow 443/tcp' "${UFW_LOG}"
+
+echo "firewall (SSH_PUBLIC=1, el defecto)"
+unset SSH_PUBLIC
+run_from 203.0.113.7
+check "por defecto: 22 público abierto aunque vengas de fuera" kept
+refute "por defecto: nunca cierra el 22 público" closed
+check "por defecto: activa ufw" enabled
+run_from 100.101.1.2
+refute "por defecto: tampoco lo cierra desde la tailnet" closed
+refute "por defecto: no abre 8000 ni los puertos del panel" grep -Eq 'allow (8000|6001|6002)' "${UFW_LOG}"
+FAKE_CONSOLE=1 run_from ""
+refute "por defecto: ni desde consola" closed
+SSH_PUBLIC=0 run_from 100.101.1.2
+check "SSH_PUBLIC=0: vuelve a cerrar desde la tailnet" closed
 
 finish

@@ -96,7 +96,14 @@ nano ~/.config/cigua/notify.env   # NTFY_TOKEN=…
   (marcador `/var/lib/cigua/apt-upgraded`); `APT_UPGRADE=1 sudo ./bootstrap.sh base` lo fuerza.
 - Los módulos corren siempre en el orden de `--list`, aunque los pidas en otro, y sin repetirse.
 
-### Cuándo el firewall cierra el SSH público
+### SSH público o solo por la tailnet
+
+Por defecto (`SSH_PUBLIC=1`) el 22 queda abierto también fuera de la tailnet: solo llaves, sin root,
+con fail2ban. Así Coolify valida su servidor `localhost` y puedes entrar sin Tailscale. El panel de
+Coolify (8000, 6001, 6002) no se abre nunca: escucha solo en la IP de la tailnet.
+Con `SSH_PUBLIC=0` el SSH va solo por Tailscale y rige la guarda de abajo (pasos 3 y 4 de esta guía).
+
+#### Cuándo el firewall cierra el SSH público (SSH_PUBLIC=0)
 
 Solo con una prueba positiva: entraste por la tailnet (cliente y IP local en `100.64.0.0/10`),
 corres desde la consola del proveedor, o pones `FORCE_FIREWALL=1`. Dentro de tmux o herdr no hay IP de

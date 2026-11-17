@@ -13,7 +13,7 @@ set -euo pipefail
 #   VPS_USER              usuario de trabajo (por defecto: cigua).
 #   AUTHORIZED_KEYS_URLS  URLs de llaves públicas, separadas por espacio. Por defecto, las
 #                         llaves de savaf/dotfiles (andrea y songbird).
-#   VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS
+#   VPS_HOSTNAME TIMEZONE SWAP_GB SSH_PUBLIC PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS
 #   CIGUA_REPO (por defecto este repo) · CIGUA_REF (rama, tag o commit) · CIGUA_DIR (/opt/cigua)
 # Coolify: COOLIFY=1 (o responde "s" a la pregunta) lo instala; entonces pide COOLIFY_ADMIN_EMAIL y
 #   COOLIFY_ADMIN_PASSWORD y abre 80/443. Todas las preguntas tienen defecto: Enter las acepta.
@@ -91,7 +91,7 @@ render_host_env() {
   done
 
   # Todo se valida antes de abrir el destino: un fallo no deja un host.env a medias.
-  local names=(VPS_USER VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS)
+  local names=(VPS_USER VPS_HOSTNAME TIMEZONE SWAP_GB SSH_PUBLIC PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS)
   for name in "${names[@]}"; do
     safe_value "${!name:-}" || fail "valor no permitido en ${name}"
   done
@@ -187,9 +187,12 @@ main() {
 
 [install] Listo. Siguiente:
   1. Entra por la tailnet:  ssh ${VPS_USER}@${VPS_HOSTNAME}
-  2. Cierra el SSH público: cd ${CIGUA_DIR} && sudo ./bootstrap.sh firewall
-  3. Revisa docs/primer-arranque.md (llave del VPS, ntfy).
+  2. Revisa docs/primer-arranque.md (llave del VPS, ntfy).
 EOF
+  # Con SSH_PUBLIC=0 el 22 público se queda abierto en la primera pasada (entraste desde fuera).
+  if [[ "$(host_env_value "${CIGUA_DIR}/host.env" SSH_PUBLIC)" == 0 ]]; then
+    echo "  3. Cierra el SSH público: cd ${CIGUA_DIR} && sudo ./bootstrap.sh firewall"
+  fi
 }
 
 # CIGUA_INSTALL_SOURCED=1 permite cargar las funciones en tests sin ejecutar nada.

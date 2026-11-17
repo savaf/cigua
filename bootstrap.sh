@@ -12,7 +12,7 @@ export ROOT_DIR
 source "${ROOT_DIR}/lib/common.sh"
 
 # Orden importa: el usuario antes que ssh (que cierra el login de root), Tailscale antes
-# que el firewall (que deja el SSH solo en la tailnet), git-key antes que agents (clona por SSH).
+# que el firewall (que con SSH_PUBLIC=0 deja el SSH solo en la tailnet), git-key antes que agents (clona por SSH).
 MODULES=(base swap user tailscale ssh firewall hardening coolify dotfiles git-key claude-managed agents)
 
 describe() {
@@ -22,7 +22,7 @@ describe() {
     user)           echo "usuario de trabajo, sudo, linger, authorized_keys" ;;
     tailscale)      echo "unir el VPS a la tailnet con tag:server" ;;
     ssh)            echo "endurecer sshd: sin contraseñas ni root" ;;
-    firewall)       echo "ufw: SSH solo por tailscale0 (con guarda anti-bloqueo)" ;;
+    firewall)       echo "ufw: SSH público o solo por tailscale0 (SSH_PUBLIC; con guarda anti-bloqueo)" ;;
     hardening)      echo "sysctl y fail2ban (tailnet exenta)" ;;
     coolify)        echo "Coolify en este VPS, solo con COOLIFY=1 (panel solo por la tailnet)" ;;
     dotfiles)       echo "clonar savaf/dotfiles y correr su bootstrap (shell, Claude, herdr)" ;;

@@ -7,7 +7,7 @@ Coolify controla Docker: equivale a root en la máquina. Por eso se instala con 
 - Solo con `COOLIFY=1` en el archivo de config del host. Si no, se omite.
 - Panel (8000) y realtime (6001, 6002) **solo en la IP de la tailnet**, con un
   `docker-compose.custom.yml` escrito antes de instalar. Docker se salta ufw, por eso no basta el firewall.
-- 80 y 443 (proxy) por `PUBLIC_TCP_PORTS="80 443"`. Nada más público.
+- 80 y 443 (proxy) por `PUBLIC_TCP_PORTS="80 443"`. El 22 queda abierto con `SSH_PUBLIC=1` (por defecto); lo demás, no.
 - Corre bajo su propio usuario, `coolify` (`COOLIFY_USER`), distinto de `VPS_USER`: los agentes
   no comparten usuario, home ni llaves con Coolify. Sin contraseña, solo entra por llave, con
   sudo sin contraseña (`/etc/sudoers.d/90-cigua-coolify`) porque administra Docker y el host.
@@ -39,6 +39,14 @@ ss -tlnp | grep -E ':(8000|6001|6002)'   # solo la IP 100.x, nunca 0.0.0.0
 ```
 
 Desde fuera de la tailnet, `curl http://<ip-publica>:8000` debe fallar.
+
+## Servidor localhost: "Server is not reachable"
+
+Coolify valida su servidor `localhost` entrando por SSH como `coolify` desde su contenedor. Con `ufw` en
+`SSH_PUBLIC=0` esa conexión se bloquea (solo se permite `tailscale0`). Con `SSH_PUBLIC=1` (por defecto) pasa;
+`sshd` sigue limitando al usuario `coolify` a localhost y a la red de Docker. Si aun así falla, mira
+`journalctl -u ssh` mientras pulsas *Check Again* y comprueba que la llave pública del panel está en
+`~coolify/.ssh/authorized_keys`.
 
 ## Supuestos a confirmar
 

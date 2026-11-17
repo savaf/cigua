@@ -62,7 +62,7 @@ En orden. Todos son idempotentes.
 | `user` | `VPS_USER` con sudo y linger, sin grupo `docker`; `authorized_keys` con las llaves de las PCs |
 | `tailscale` | Une el VPS con `tag:server` y `--accept-dns=false` |
 | `ssh` | Drop-in de sshd: solo llaves, sin root. No actúa si `VPS_USER` no tiene llaves |
-| `firewall` | ufw: SSH solo por `tailscale0`. Guarda anti-bloqueo: no cierra el 22 público si entraste desde fuera de la tailnet |
+| `firewall` | ufw: SSH abierto también fuera de la tailnet (`SSH_PUBLIC=1`, por defecto: solo llaves, sin root). Con `SSH_PUBLIC=0`, solo por `tailscale0` y con guarda anti-bloqueo. El panel de Coolify (8000, 6001, 6002) va siempre solo por la tailnet |
 | `hardening` | sysctl de red y kernel, fail2ban en sshd (la tailnet nunca se banea) |
 | `coolify` | Solo con `COOLIFY=1`: instala Coolify con panel y realtime solo por la tailnet. Ver [docs/coolify.md](docs/coolify.md) |
 | `dotfiles` | Clona `savaf/dotfiles` y corre su bootstrap como `VPS_USER` |

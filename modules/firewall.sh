@@ -1,4 +1,9 @@
-# ufw: todo cerrado salvo SSH por la tailnet y PUBLIC_TCP_PORTS.
+# ufw: todo cerrado salvo el SSH y PUBLIC_TCP_PORTS.
+#
+# SSH_PUBLIC=1 (por defecto): el 22 queda abierto también fuera de la tailnet (solo llaves, sin
+# root, fail2ban). Así Coolify valida su servidor localhost y entras sin Tailscale. Los puertos del
+# panel de Coolify (8000, 6001, 6002) NO se abren aquí: solo escuchan en la IP de la tailnet.
+# SSH_PUBLIC=0: SSH solo por tailscale0, con la guarda anti-bloqueo de abajo.
 #
 # Guarda anti-bloqueo: el SSH público solo se cierra si quien corre esto entró por la
 # tailnet (IP 100.64.0.0/10) o desde la consola del proveedor. Si entraste por la IP
@@ -24,6 +29,14 @@ run_firewall() {
   done
 
   reconcile_public_ports
+
+  if [[ "${SSH_PUBLIC:-1}" == 1 ]]; then
+    ufw allow 22/tcp comment 'cigua: ssh público' >/dev/null
+    log "SSH público abierto (SSH_PUBLIC=1): solo llaves, sin root. 8000/6001/6002 siguen solo en la tailnet"
+    ufw --force enable >/dev/null
+    ufw status verbose
+    return
+  fi
 
   local client local_ip
   client="$(ssh_client_ip)"
