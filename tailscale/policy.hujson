@@ -18,8 +18,9 @@
     // hacia tus PCs; si un agente o un paquete lo compromete, no tiene camino a ellas.
   ],
 
-  // Prueba la política antes de guardar: la consola rechaza el cambio si algo falla.
-  "tests": [
-    {"src": "autogroup:member", "accept": ["tag:server:22"], "deny": ["tag:server:80"]},
-  ],
+  // Los tests no aceptan autogroups como src: hace falta un usuario real.
+  // Descomenta y pon tu correo en la consola (no lo subas al repo) para probar la política al guardar.
+  // "tests": [
+  //   {"src": "tu@correo.com", "accept": ["tag:server:22"], "deny": ["tag:server:80"]},
+  // ],
 }
