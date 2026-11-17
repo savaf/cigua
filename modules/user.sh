@@ -9,9 +9,14 @@ run_user() {
   # La contraseña la usa sudo (y el bootstrap de dotfiles). Se lee de la terminal, no de
   # stdin: con `curl | bash` stdin es el pipe y passwd aborta sin contraseña.
   if ! has_password "${VPS_USER}"; then
-    if [[ -r /dev/tty ]]; then
+    if have_tty; then
       log "elige la contraseña de ${VPS_USER} (la pide sudo)"
-      until has_password "${VPS_USER}"; do passwd "${VPS_USER}" </dev/tty || true; done
+      local _
+      for _ in 1 2 3; do
+        passwd "${VPS_USER}" </dev/tty || true
+        has_password "${VPS_USER}" && break
+      done
+      has_password "${VPS_USER}" || die "no se fijó la contraseña de ${VPS_USER}: corre 'passwd ${VPS_USER}' y repite"
     else
       die "${VPS_USER} no tiene contraseña y no hay terminal: corre 'passwd ${VPS_USER}' y repite"
     fi

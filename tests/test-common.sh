@@ -48,4 +48,9 @@ refute "L: bloqueada" env PATH="${stub}:${PATH}" FAKE_PW=L bash -c 'source lib/c
 refute "NP: vacía" env PATH="${stub}:${PATH}" FAKE_PW=NP bash -c 'source lib/common.sh; has_password ana'
 rm -f "${stub}/passwd"; rmdir "${stub}"
 
+echo "have_tty"
+if exists setsid; then
+  refute "sin terminal de control: no hay tty" setsid -w bash -c 'source lib/common.sh; have_tty' </dev/null
+fi
+
 finish
