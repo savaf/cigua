@@ -23,11 +23,18 @@ run_firewall() {
     log "puerto público abierto: ${port}/tcp"
   done
 
-  local client
+  reconcile_public_ports
+
+  local client local_ip
   client="$(ssh_client_ip)"
+  local_ip="$(awk '{print $3}' <<<"${SSH_CONNECTION:-}")"
+  # Solo se cierra con una prueba positiva: FORCE, cliente de la tailnet (y, si se conoce, que la
+  # sesión también entrara por una IP de la tailnet) o una consola real. Ante la duda se queda abierto:
+  # dentro de tmux/herdr no hay SSH_CONNECTION ni `who -m`, y eso NO prueba que sea una consola.
   if [[ "${FORCE_FIREWALL:-0}" == 1 ]] \
-      || { [[ -n "${client}" ]] && is_tailnet_ip "${client}"; } \
-      || { [[ -z "${client}" ]] && ! in_ssh_session; }; then
+      || { [[ -n "${client}" ]] && is_tailnet_ip "${client}" \
+           && { [[ -z "${local_ip}" ]] || is_tailnet_ip "${local_ip}"; }; } \
+      || { [[ -z "${client}" ]] && is_console_tty; }; then
     close_public_ssh
   else
     ufw allow 22/tcp comment 'cigua: ssh público temporal' >/dev/null
@@ -37,6 +44,18 @@ run_firewall() {
 
   ufw --force enable >/dev/null
   ufw status verbose
+}
+
+# Quita las reglas "cigua: público" que ya no están en PUBLIC_TCP_PORTS: vacío = solo la tailnet.
+reconcile_public_ports() {
+  local rule port keep
+  while read -r rule; do
+    keep=0
+    for port in ${PUBLIC_TCP_PORTS:-}; do [[ "${rule}" == "${port}/tcp" ]] && keep=1; done
+    (( keep )) && continue
+    ufw delete allow "${rule}" >/dev/null 2>&1 || true
+    log "puerto público cerrado: ${rule}"
+  done < <(ufw status | awk '/cigua: público/ {print $1}' | sort -u)
 }
 
 close_public_ssh() {

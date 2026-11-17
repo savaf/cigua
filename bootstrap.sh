@@ -32,6 +32,22 @@ describe() {
   esac
 }
 
+# Módulos pedidos, en el orden de MODULES y sin repetir. Un nombre que no esté en MODULES
+# muere: así `../../tmp/x` nunca llega a cargarse como código.
+order_modules() {
+  local m want ok
+  for want in "$@"; do
+    ok=0
+    for m in "${MODULES[@]}"; do [[ "${m}" == "${want}" ]] && ok=1; done
+    (( ok )) || die "módulo desconocido: ${want} (ver --list)"
+  done
+  for m in "${MODULES[@]}"; do
+    for want in "$@"; do
+      if [[ "${m}" == "${want}" ]]; then echo "${m}"; break; fi
+    done
+  done
+}
+
 main() {
   if [[ "${1:-}" == "--list" ]]; then
     for m in "${MODULES[@]}"; do printf '%-15s %s\n' "${m}" "$(describe "${m}")"; done
@@ -41,12 +57,13 @@ main() {
   require_root "$@"
   load_host_env
 
-  local selected=("$@")
-  (( ${#selected[@]} )) || selected=("${MODULES[@]}")
-
-  for m in "${selected[@]}"; do
-    [[ -f "${ROOT_DIR}/modules/${m}.sh" ]] || die "módulo desconocido: ${m} (ver --list)"
-  done
+  local selected=() ordered
+  if (( $# )); then
+    ordered="$(order_modules "$@")"   # asignación simple: si muere, set -e corta aquí
+    mapfile -t selected <<<"${ordered}"
+  else
+    selected=("${MODULES[@]}")
+  fi
 
   local n=0 total=${#selected[@]}
   for m in "${selected[@]}"; do
@@ -60,4 +77,5 @@ main() {
   log "Listo."
 }
 
-main "$@"
+# CIGUA_BOOTSTRAP_SOURCED=1 permite cargar las funciones en tests sin ejecutar nada.
+[[ -n "${CIGUA_BOOTSTRAP_SOURCED:-}" ]] || main "$@"

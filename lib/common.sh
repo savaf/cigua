@@ -101,6 +101,19 @@ ssh_client_ip() {
   who -m 2>/dev/null | sed -n 's/.*(\(.*\)).*/\1/p'
 }
 
+# ¿La sesión viene de una consola real (la del proveedor), no de tmux/herdr dentro de SSH?
+# Es la única prueba positiva de "no estoy entrando por red" cuando no hay IP de cliente.
+is_console_tty() { [[ "$(tty 2>/dev/null)" =~ ^/dev/(tty[0-9]+|ttyS[0-9]+|hvc[0-9]+)$ ]]; }
+
+# ¿GitHub acepta la llave del usuario de trabajo? ssh -T sale 1 aun con éxito, y con
+# pipefail `ssh | grep -q` nunca da cierto: se captura la salida y se compara.
+github_accepts_key() {
+  local out
+  out="$(as_user ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
+    -T git@github.com 2>&1 || true)"
+  [[ "${out}" == *"successfully authenticated"* ]]
+}
+
 # ¿Este proceso desciende de una sesión SSH? Cubre `ssh host 'sudo …'` sin TTY, donde
 # no hay SSH_CONNECTION (sudo la limpia) ni `who -m`. sshd-session: OpenSSH ≥ 9.8.
 in_ssh_session() {

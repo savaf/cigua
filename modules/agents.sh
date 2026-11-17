@@ -24,7 +24,7 @@ clone_repos() {
   local home="$1" list="${ROOT_DIR}/repos.txt" path url
   [[ -f "${list}" ]] || return 0
 
-  if ! as_user ssh -o BatchMode=yes -T git@github.com 2>&1 | grep -q 'successfully authenticated'; then
+  if ! github_accepts_key; then
     warn "GitHub aún no acepta la llave del VPS: no clono repos (ver el módulo git-key)"
     return
   fi
