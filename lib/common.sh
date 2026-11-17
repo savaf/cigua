@@ -22,6 +22,18 @@ load_host_env() {
   : "${VPS_USER:?VPS_USER vacío en host.env}"
 }
 
+# Rangos desde los que salen los contenedores de Docker: los default-address-pools de daemon.json
+# o, si no hay, el rango por defecto de Docker. Es la única fuente: sshd (Match) y ufw la usan.
+# Una línea por rango; solo se aceptan CIDR (van a un archivo de sshd y a reglas de ufw).
+docker_cidrs() {
+  local f="${DOCKER_DAEMON_JSON:-/etc/docker/daemon.json}" out=""
+  if [[ -r "${f}" ]]; then
+    out="$(jq -r '.["default-address-pools"][]?.base // empty' "${f}" 2>/dev/null \
+      | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$' || true)"
+  fi
+  if [[ -n "${out}" ]]; then echo "${out}"; else echo "172.16.0.0/12"; fi
+}
+
 # ¿Hay una terminal real? [[ -r /dev/tty ]] no basta: da cierto aunque no haya terminal
 # de control (cloud-init, cron) y el open falla después. Se prueba abriéndola.
 have_tty() { (: </dev/tty) 2>/dev/null; }

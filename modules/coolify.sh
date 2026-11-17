@@ -3,7 +3,8 @@
 # Riesgo asumido: Coolify controla Docker, o sea root efectivo en la máquina. Por eso:
 #  - corre bajo su propio usuario (COOLIFY_USER, por defecto "coolify"), distinto de VPS_USER:
 #    los agentes no comparten usuario, home ni llaves con Coolify;
-#  - panel (8000) y realtime (6001/6002) publicados SOLO en la IP de la tailnet;
+#  - panel (8000) publicado SOLO en la IP de la tailnet; realtime y terminal (6001/6002) no se
+#    publican en el host: van por el proxy cuando la instancia tiene dominio (COOLIFY_DOMAIN);
 #  - 80/443 los abre PUBLIC_TCP_PORTS (proxy de Coolify), nada más;
 #  - VPS_USER nunca entra al grupo docker (módulo user);
 #  - root sigue sin poder entrar por SSH; ese usuario solo entra desde localhost y Docker;
@@ -17,6 +18,80 @@ COOLIFY_USER="${COOLIFY_USER:-coolify}"
 # Renderiza el compose de override con la IP de la tailnet.
 render_coolify_compose() {
   sed "s/__TAILNET_IP__/$1/g" "${ROOT_DIR}/files/coolify/docker-compose.custom.yml.tpl"
+}
+
+# Renderiza el drop-in de sshd: el Match exime a localhost y a los rangos de Docker (docker_cidrs).
+# $1 = usuario de Coolify.
+render_coolify_sshd() {
+  local cidrs="" c
+  while read -r c; do cidrs+=",!${c}"; done < <(docker_cidrs)
+  sed -e "s/__COOLIFY_USER__/$1/g" -e "s|__DOCKER_CIDRS__|${cidrs}|g" "${ROOT_DIR}/files/sshd/90-cigua-coolify.conf"
+}
+
+# Instala el drop-in validado: si sshd -t falla se restaura el anterior (un Match roto deja sshd sin
+# arrancar tras un reinicio). Siempre valida y recarga, también en repeticiones. $1 = usuario.
+install_coolify_sshd() {
+  local dropin="${COOLIFY_SSHD_DROPIN:-/etc/ssh/sshd_config.d/90-cigua-coolify.conf}" backup
+  backup="$(mktemp)"
+  if [[ -f "${dropin}" ]]; then cp -p "${dropin}" "${backup}"; else : >"${backup}"; fi
+  render_coolify_sshd "$1" | install_if_changed - "${dropin}" || true
+  if ! sshd -t; then
+    if [[ -s "${backup}" ]]; then cp -p "${backup}" "${dropin}"; else rm -f "${dropin}"; fi
+    rm -f "${backup}"
+    die "sshd -t falló con ${dropin}; deshice el cambio"
+  fi
+  rm -f "${backup}"
+  systemctl try-reload-or-restart ssh 2>/dev/null || systemctl try-reload-or-restart sshd
+}
+
+# ¿Quién escucha en el puerto $1 (TCP)? Imprime el nombre del proceso (o "proceso desconocido") y
+# sale 0 si hay alguien; sale 1 si está libre. Sirve para parar antes de instalar el proxy.
+port_in_use_by() {
+  local line proc
+  line="$(ss -ltnpH "sport = :$1" 2>/dev/null | head -n1 || true)"
+  [[ -n "${line}" ]] || return 1
+  proc="$(grep -o 'users:(("[^"]*"' <<<"${line}" | head -n1 | sed 's/users:(("//; s/"$//' || true)"
+  echo "${proc:-proceso desconocido}"
+}
+
+# El proxy de Coolify (Traefik) necesita el 80 y el 443 libres: si no, el instalador falla con un
+# "Port 80 is in use" poco claro. Se para antes y se dice quién los tiene.
+check_proxy_ports_free() {
+  local port who
+  for port in 80 443; do
+    if who="$(port_in_use_by "${port}")"; then
+      die "el puerto ${port} está en uso por ${who}: páralo (p. ej. sudo systemctl disable --now ${who}) y repite"
+    fi
+  done
+}
+
+# Los contenedores entran al host por SSH (Coolify valida su servidor localhost): se permite
+# desde los rangos de Docker aunque el 22 público esté cerrado. No lleva el comentario
+# "cigua: público", así que el firewall no la concilia ni la borra.
+allow_docker_to_ssh() {
+  local c
+  while read -r c; do
+    ufw allow from "${c}" to any port 22 proto tcp comment 'cigua: docker a host' >/dev/null
+  done < <(docker_cidrs)
+}
+
+# ¿Tiene el archivo alguna llave pública? Solo cuenta líneas, nunca lee llaves privadas.
+coolify_has_key() { grep -qE '^(ssh-|ecdsa-|sk-)' "$1" 2>/dev/null; }
+
+# Avisos de lo que el módulo no puede hacer solo. $1 = usuario de Coolify.
+coolify_post_checks() {
+  local home
+  home="$(getent passwd "$1" | cut -d: -f6)"
+  coolify_has_key "${home}/.ssh/authorized_keys" \
+    || warn "${home}/.ssh/authorized_keys no tiene la llave pública del panel: cópiala desde Servidores → localhost → Current Public Key"
+  if [[ -n "${COOLIFY_DOMAIN:-}" ]]; then
+    if [[ "${COOLIFY_DOMAIN}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+      log "Dominio ${COOLIFY_DOMAIN}: crea un registro A hacia la IP pública del VPS y luego pon https://${COOLIFY_DOMAIN} en Settings → Instance's Domain"
+    else
+      warn "COOLIFY_DOMAIN no parece un dominio válido; lo ignoro"
+    fi
+  fi
+  warn "El instalador de Coolify crea el servidor localhost con usuario root: en el panel (Servidores → localhost) cámbialo a $1 y pulsa Validate."
 }
 
 # Línea de sudoers: Coolify administra Docker y el host. SETENV para el `sudo -E` del instalador.
@@ -61,11 +136,8 @@ run_coolify() {
   ensure_coolify_user "${COOLIFY_USER}"
 
   # El usuario de Coolify solo entra por SSH desde localhost y la red de Docker.
-  if sed "s/__COOLIFY_USER__/${COOLIFY_USER}/g" "${ROOT_DIR}/files/sshd/90-cigua-coolify.conf" \
-      | install_if_changed - /etc/ssh/sshd_config.d/90-cigua-coolify.conf; then
-    sshd -t || die "sshd -t falló con 90-cigua-coolify.conf"
-    systemctl reload ssh 2>/dev/null || systemctl reload sshd
-  fi
+  install_coolify_sshd "${COOLIFY_USER}"
+  allow_docker_to_ssh
 
   # El override va ANTES de instalar: así el panel nunca llega a escuchar en 0.0.0.0.
   mkdir -p "${COOLIFY_DIR}"
@@ -75,8 +147,11 @@ run_coolify() {
     log "Coolify ya instalado: aplico el override de puertos"
     (cd "${COOLIFY_DIR}" && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml up -d) \
       || warn "no pude reaplicar el compose; revisa ${COOLIFY_DIR}"
+    coolify_post_checks "${COOLIFY_USER}"
     return
   fi
+
+  check_proxy_ports_free
 
   local script
   script="$(mktemp)"
@@ -94,5 +169,6 @@ run_coolify() {
 
   # Coolify opera Docker como este usuario; el grupo existe una vez instalado Docker.
   if getent group docker >/dev/null; then usermod -aG docker "${COOLIFY_USER}"; fi
-  log "panel en http://${ip}:8000 (solo por la tailnet). Revisa: ss -tlnp | grep -E ':(8000|6001|6002)'"
+  log "panel en http://${ip}:8000 (solo por la tailnet). Revisa: ss -tlnp | grep ':8000'"
+  coolify_post_checks "${COOLIFY_USER}"
 }

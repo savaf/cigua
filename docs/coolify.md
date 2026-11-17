@@ -5,8 +5,10 @@ Coolify controla Docker: equivale a root en la máquina. Por eso se instala con 
 ## Qué hace el módulo
 
 - Solo con `COOLIFY=1` en el archivo de config del host. Si no, se omite.
-- Panel (8000) y realtime (6001, 6002) **solo en la IP de la tailnet**, con un
-  `docker-compose.custom.yml` escrito antes de instalar. Docker se salta ufw, por eso no basta el firewall.
+- Panel (8000) **solo en la IP de la tailnet**, con un `docker-compose.custom.yml` escrito antes de
+  instalar. Docker se salta ufw, por eso no basta el firewall. El realtime y la terminal web
+  (6001, 6002) **no se publican en el host**: se sirven por el proxy cuando hay dominio.
+- Antes de instalar comprueba que el 80 y el 443 estén libres; si no, se detiene y dice qué proceso los tiene.
 - 80 y 443 (proxy) por `PUBLIC_TCP_PORTS="80 443"`. Nada más público.
 - Corre bajo su propio usuario, `coolify` (`COOLIFY_USER`), distinto de `VPS_USER`: los agentes
   no comparten usuario, home ni llaves con Coolify. Sin contraseña, solo entra por llave, con
@@ -35,17 +37,58 @@ los puertos 8000, 6001 y 6002 hacia `tag:server`; si usas una política antigua,
 ## Verificar (tras instalar)
 
 ```bash
-ss -tlnp | grep -E ':(8000|6001|6002)'   # solo la IP 100.x, nunca 0.0.0.0
+ss -tlnp | grep ':8000'   # solo la IP 100.x, nunca 0.0.0.0
+ss -tlnp | grep -E ':(6001|6002)'   # no debe salir nada
 ```
 
 Desde fuera de la tailnet, `curl http://<ip-publica>:8000` debe fallar.
+
+## Dominio (opcional)
+
+Con `COOLIFY_DOMAIN` (o la pregunta del instalador) el módulo recuerda los pasos, no los hace solo:
+
+1. Crea un registro A del dominio hacia la IP pública del VPS.
+2. En el panel: Settings → Instance's Domain → `https://<dominio>`.
+
+Con dominio, el realtime y la terminal web (6001, 6002) llegan por el proxy en 443, sin abrir puertos.
+
+## Puertos
+
+| Puerto | Qué | Dónde |
+|---|---|---|
+| 22 | SSH y validación del servidor localhost | `SSH_PUBLIC` (por defecto abierto) y los rangos de Docker (regla `cigua: docker a host`) |
+| 80, 443 | Proxy y certificados | Públicos (`PUBLIC_TCP_PORTS="80 443"`) |
+| 8000 | Panel (configuración inicial) | Solo la IP de la tailnet (override del compose + ACL). No se abre a internet |
+| 6001, 6002 | Tiempo real y terminal web | No se publican en el host; van por el proxy cuando hay dominio |
+
+## Diagnóstico: "Port 80 is in use"
+
+Algo más escucha en el 80 (en tu caso, nginx instalado por los dotfiles). El módulo lo detecta antes de
+instalar y nombra el proceso. Páralo (`sudo systemctl disable --now nginx`) y repite. Si el error aparece
+ya con Coolify instalado, mira `sudo ss -ltnp | grep -E ':(80|443) '` y `sudo docker ps`: el proxy de Coolify
+(Traefik) debe ser quien los tiene, y en el panel (Servers → localhost → Proxy) debe estar en *Running*.
+
+## Diagnóstico: "Server is not reachable"
+
+Mira `sudo journalctl -u ssh -f` mientras pulsas *Check Again*:
+
+- `Connection refused` al conectar al host: `ufw` o `sshd` no escuchan para esa red. Comprueba la regla
+  `cigua: docker a host` en `ufw status` y que `docker_cidrs` coincida con la red del contenedor
+  (`docker network inspect coolify`).
+- `User coolify from 10.x.x.x not allowed`: el `Match` de `/etc/ssh/sshd_config.d/90-cigua-coolify.conf`
+  no exime el rango del contenedor. Revisa `default-address-pools` y vuelve a correr `sudo ./bootstrap.sh coolify`.
+- `Connection closed by authenticating user root`: el servidor localhost del panel sigue con usuario
+  `root`. En el panel (Servidores → localhost) cámbialo a `coolify` y valida.
+- `Failed publickey` o `no matching key`: la llave del panel ("Current Public Key") no está en
+  `~coolify/.ssh/authorized_keys`. El módulo avisa si el archivo no tiene ninguna llave.
 
 ## Supuestos a confirmar
 
 - El servicio realtime se llama `soketi` en el compose de Coolify.
 - El instalador lanzado como usuario no root coloca la llave de Coolify en `~coolify/.ssh/authorized_keys`. Si no, añádela a mano y registra el servidor con el usuario `coolify` en el panel.
-- El contenedor entra al host por la red `172.16.0.0/12`. Si Coolify no valida el servidor
-  localhost, revisa con `journalctl -u ssh` desde qué IP llega.
+- El contenedor entra al host desde los rangos de `default-address-pools` de `/etc/docker/daemon.json`
+  (o `172.16.0.0/12` si no hay): `docker_cidrs` en `lib/common.sh` es la única fuente, y de ella salen el
+  `Match` de sshd y las reglas de ufw. Si Coolify no valida el servidor localhost, mira el diagnóstico.
 - El instalador no permite fijar versión; el módulo muestra su sha256 al descargarlo.
 
 ## Riesgo que queda

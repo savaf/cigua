@@ -82,4 +82,15 @@ PUBLIC_TCP_PORTS="80 443" run_from 100.101.1.2
 check "PUBLIC_TCP_PORTS abre 80" grep -q '^allow 80/tcp' "${UFW_LOG}"
 check "PUBLIC_TCP_PORTS abre 443" grep -q '^allow 443/tcp' "${UFW_LOG}"
 
+echo "firewall: regla de Docker a host"
+cat >"${work}/bin/ufw" <<'EOF'
+#!/bin/sh
+echo "$*" >>"${UFW_LOG}"
+[ "$1" = status ] && printf '10.0.0.0/8 ALLOW IN Anywhere # cigua: docker a host\n80/tcp ALLOW IN Anywhere # cigua: público\n'
+exit 0
+EOF
+PUBLIC_TCP_PORTS="80" run_from 100.101.1.2
+refute "conciliar puertos públicos no toca 'cigua: docker a host'" grep -q 'delete allow 10.0.0.0/8' "${UFW_LOG}"
+refute "cerrar el 22 público no borra la regla de Docker" grep -Eq 'delete allow (from|10)' "${UFW_LOG}"
+
 finish
