@@ -18,6 +18,12 @@ Coolify controla Docker: equivale a root en la máquina. Por eso se instala con 
 
 ## Instalar
 
+Con el instalador de una línea basta responder **s** a "¿Instalar Coolify?" (o `COOLIFY=1` por entorno):
+pide el correo y la contraseña del admin (sin eco, no se guardan), abre 80/443 y lo instala. Todas las
+preguntas del instalador tienen defecto: Enter las acepta (Coolify, por defecto, no).
+
+A mano:
+
 ```bash
 # config del host: COOLIFY=1 y PUBLIC_TCP_PORTS="80 443"
 sudo COOLIFY_ADMIN_EMAIL=tu@correo COOLIFY_ADMIN_PASSWORD='…' ./bootstrap.sh firewall hardening coolify

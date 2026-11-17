@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/savaf/cigua/main/install.sh \
 ```
 
 - `VPS_USER` por defecto es `cigua` (pásala para otro). `AUTHORIZED_KEYS_URLS` por defecto usa las llaves de `savaf/dotfiles` (andrea y songbird); pásala para usar otras.
-- Opcionales: `VPS_HOSTNAME`, `TIMEZONE`, `SWAP_GB`, `PUBLIC_TCP_PORTS`, `COOLIFY=1`, `CIGUA_REF` (rama, tag o commit para fijar versión).
+- Opcionales: `VPS_HOSTNAME`, `TIMEZONE`, `SWAP_GB`, `PUBLIC_TCP_PORTS`, `COOLIFY=1` (o responder "s" a la pregunta; pide el admin y abre 80/443), `CIGUA_REF` (rama, tag o commit para fijar versión).
 - Secretos solo por entorno: `TS_AUTHKEY`, `COOLIFY_ADMIN_EMAIL`, `COOLIFY_ADMIN_PASSWORD`. Nunca se escriben a disco.
 - Es idempotente: volver a correrlo actualiza el repo y reaplica los módulos.
 - Cuidado con `curl | bash`: léelo antes (`curl -fsSL <url> | less`) y fija `CIGUA_REF` a un commit que hayas revisado.
