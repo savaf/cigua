@@ -92,4 +92,13 @@ nano ~/.config/cigua/notify.env   # NTFY_TOKEN=…
 ## Después
 
 - Cualquier cambio: edita el repo, `git pull` en el VPS, `sudo ./bootstrap.sh <módulo>`.
-- Todo de nuevo es seguro: `sudo ./bootstrap.sh`.
+- Todo de nuevo es seguro: `sudo ./bootstrap.sh`. El `apt upgrade` completo solo corre la primera vez
+  (marcador `/var/lib/cigua/apt-upgraded`); `APT_UPGRADE=1 sudo ./bootstrap.sh base` lo fuerza.
+- Los módulos corren siempre en el orden de `--list`, aunque los pidas en otro, y sin repetirse.
+
+### Cuándo el firewall cierra el SSH público
+
+Solo con una prueba positiva: entraste por la tailnet (cliente y IP local en `100.64.0.0/10`),
+corres desde la consola del proveedor, o pones `FORCE_FIREWALL=1`. Dentro de tmux o herdr no hay IP de
+cliente ni consola, así que se deja abierto: entra por `ssh cigua@cigua` y repite
+`sudo ./bootstrap.sh firewall`. Las reglas "cigua: público" que ya no estén en `PUBLIC_TCP_PORTS` se borran.

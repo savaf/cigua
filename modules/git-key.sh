@@ -41,8 +41,7 @@ run_git_key() {
   write_managed_block "${zshenv}" 'export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"'
   chown "${VPS_USER}:${VPS_USER}" "${zshenv}"
 
-  if as_user ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 \
-      | grep -q 'successfully authenticated'; then
+  if github_accepts_key; then
     log "GitHub acepta la llave de ${VPS_HOSTNAME} ✔"
     return
   fi
