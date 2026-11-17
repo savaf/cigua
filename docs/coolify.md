@@ -29,7 +29,8 @@ A mano:
 sudo COOLIFY_ADMIN_EMAIL=tu@correo COOLIFY_ADMIN_PASSWORD='…' ./bootstrap.sh firewall hardening coolify
 ```
 
-Panel: `http://cigua:8000` desde un equipo de la tailnet.
+Panel: `http://cigua:8000` desde un equipo de la tailnet. La ACL (`tailscale/policy.hujson`) ya permite
+los puertos 8000, 6001 y 6002 hacia `tag:server`; si usas una política antigua, pega la actual en la consola de Tailscale.
 
 ## Verificar (tras instalar)
 
