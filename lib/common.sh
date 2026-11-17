@@ -22,6 +22,10 @@ load_host_env() {
   : "${VPS_USER:?VPS_USER vacío en host.env}"
 }
 
+# ¿Hay una terminal real? [[ -r /dev/tty ]] no basta: da cierto aunque no haya terminal
+# de control (cloud-init, cron) y el open falla después. Se prueba abriéndola.
+have_tty() { (: </dev/tty) 2>/dev/null; }
+
 # ¿El usuario tiene contraseña usable? (passwd -S: segundo campo P = sí, L = bloqueada, NP = vacía)
 has_password() { [[ "$(passwd -S "$1" 2>/dev/null | awk '{print $2}')" == P ]]; }
 

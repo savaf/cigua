@@ -22,13 +22,17 @@ CIGUA_REF="${CIGUA_REF:-main}"
 CIGUA_DIR="${CIGUA_DIR:-/opt/cigua}"
 DEFAULT_KEYS="https://raw.githubusercontent.com/savaf/dotfiles/main/ssh/.ssh/andrea.pub https://raw.githubusercontent.com/savaf/dotfiles/main/ssh/.ssh/songbird.pub"
 
+# ¿Hay una terminal real? [[ -r /dev/tty ]] no basta: da cierto aunque no haya terminal
+# de control (cloud-init, cron) y el open falla después. Se prueba abriéndola.
+have_tty() { (: </dev/tty) 2>/dev/null; }
+
 say()  { echo "[install] $*"; }
 fail() { echo "[install] ERROR: $*" >&2; exit 1; }
 
 # Valor por entorno; si falta y hay terminal, lo pregunta. $1 nombre, $2 pregunta, $3 defecto opcional.
 ask() {
   local name="$1" prompt="$2" default="${3:-}" value="${!1:-}"
-  if [[ -z "${value}" && -r /dev/tty ]]; then
+  if [[ -z "${value}" ]] && have_tty; then
     read -r -p "${prompt}${default:+ [${default}]}: " value </dev/tty || true
   fi
   printf -v "${name}" '%s' "${value:-${default}}"
@@ -116,7 +120,7 @@ main() {
 
   cd "${CIGUA_DIR}"
   # Con `curl | bash` stdin es el pipe: passwd y sudo (dotfiles) necesitan la terminal.
-  [[ -r /dev/tty ]] && exec </dev/tty
+  have_tty && exec </dev/tty
   ./bootstrap.sh
 
   show_pubkey "$(getent passwd "${VPS_USER}" | cut -d: -f6)/.ssh/${VPS_HOSTNAME}_ed25519.pub"
