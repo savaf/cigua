@@ -19,6 +19,52 @@ render_coolify_compose() {
   sed "s/__TAILNET_IP__/$1/g" "${ROOT_DIR}/files/coolify/docker-compose.custom.yml.tpl"
 }
 
+# Renderiza el drop-in de sshd: el Match exime a localhost y a los rangos de Docker (docker_cidrs).
+# $1 = usuario de Coolify.
+render_coolify_sshd() {
+  local cidrs="" c
+  while read -r c; do cidrs+=",!${c}"; done < <(docker_cidrs)
+  sed -e "s/__COOLIFY_USER__/$1/g" -e "s|__DOCKER_CIDRS__|${cidrs}|g" "${ROOT_DIR}/files/sshd/90-cigua-coolify.conf"
+}
+
+# Instala el drop-in validado: si sshd -t falla se restaura el anterior (un Match roto deja sshd sin
+# arrancar tras un reinicio). Siempre valida y recarga, también en repeticiones. $1 = usuario.
+install_coolify_sshd() {
+  local dropin="${COOLIFY_SSHD_DROPIN:-/etc/ssh/sshd_config.d/90-cigua-coolify.conf}" backup
+  backup="$(mktemp)"
+  if [[ -f "${dropin}" ]]; then cp -p "${dropin}" "${backup}"; else : >"${backup}"; fi
+  render_coolify_sshd "$1" | install_if_changed - "${dropin}" || true
+  if ! sshd -t; then
+    if [[ -s "${backup}" ]]; then cp -p "${backup}" "${dropin}"; else rm -f "${dropin}"; fi
+    rm -f "${backup}"
+    die "sshd -t falló con ${dropin}; deshice el cambio"
+  fi
+  rm -f "${backup}"
+  systemctl try-reload-or-restart ssh 2>/dev/null || systemctl try-reload-or-restart sshd
+}
+
+# Los contenedores entran al host por SSH (Coolify valida su servidor localhost): se permite
+# desde los rangos de Docker aunque el 22 público esté cerrado. No lleva el comentario
+# "cigua: público", así que el firewall no la concilia ni la borra.
+allow_docker_to_ssh() {
+  local c
+  while read -r c; do
+    ufw allow from "${c}" to any port 22 proto tcp comment 'cigua: docker a host' >/dev/null
+  done < <(docker_cidrs)
+}
+
+# ¿Tiene el archivo alguna llave pública? Solo cuenta líneas, nunca lee llaves privadas.
+coolify_has_key() { grep -qE '^(ssh-|ecdsa-|sk-)' "$1" 2>/dev/null; }
+
+# Avisos de lo que el módulo no puede hacer solo. $1 = usuario de Coolify.
+coolify_post_checks() {
+  local home
+  home="$(getent passwd "$1" | cut -d: -f6)"
+  coolify_has_key "${home}/.ssh/authorized_keys" \
+    || warn "${home}/.ssh/authorized_keys no tiene la llave pública del panel: cópiala desde Servidores → localhost → Current Public Key"
+  warn "El instalador de Coolify crea el servidor localhost con usuario root: en el panel (Servidores → localhost) cámbialo a $1 y pulsa Validate."
+}
+
 # Línea de sudoers: Coolify administra Docker y el host. SETENV para el `sudo -E` del instalador.
 coolify_sudoers() {
   echo "$1 ALL=(ALL) NOPASSWD:SETENV:ALL"
@@ -61,11 +107,8 @@ run_coolify() {
   ensure_coolify_user "${COOLIFY_USER}"
 
   # El usuario de Coolify solo entra por SSH desde localhost y la red de Docker.
-  if sed "s/__COOLIFY_USER__/${COOLIFY_USER}/g" "${ROOT_DIR}/files/sshd/90-cigua-coolify.conf" \
-      | install_if_changed - /etc/ssh/sshd_config.d/90-cigua-coolify.conf; then
-    sshd -t || die "sshd -t falló con 90-cigua-coolify.conf"
-    systemctl reload ssh 2>/dev/null || systemctl reload sshd
-  fi
+  install_coolify_sshd "${COOLIFY_USER}"
+  allow_docker_to_ssh
 
   # El override va ANTES de instalar: así el panel nunca llega a escuchar en 0.0.0.0.
   mkdir -p "${COOLIFY_DIR}"
@@ -75,6 +118,7 @@ run_coolify() {
     log "Coolify ya instalado: aplico el override de puertos"
     (cd "${COOLIFY_DIR}" && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml up -d) \
       || warn "no pude reaplicar el compose; revisa ${COOLIFY_DIR}"
+    coolify_post_checks "${COOLIFY_USER}"
     return
   fi
 
@@ -95,4 +139,5 @@ run_coolify() {
   # Coolify opera Docker como este usuario; el grupo existe una vez instalado Docker.
   if getent group docker >/dev/null; then usermod -aG docker "${COOLIFY_USER}"; fi
   log "panel en http://${ip}:8000 (solo por la tailnet). Revisa: ss -tlnp | grep -E ':(8000|6001|6002)'"
+  coolify_post_checks "${COOLIFY_USER}"
 }

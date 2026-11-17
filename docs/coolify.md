@@ -40,12 +40,35 @@ ss -tlnp | grep -E ':(8000|6001|6002)'   # solo la IP 100.x, nunca 0.0.0.0
 
 Desde fuera de la tailnet, `curl http://<ip-publica>:8000` debe fallar.
 
+## Puertos
+
+| Puerto | Qué | Dónde |
+|---|---|---|
+| 22 | SSH y validación del servidor localhost | `SSH_PUBLIC` (por defecto abierto) y los rangos de Docker (regla `cigua: docker a host`) |
+| 80, 443 | Proxy y certificados | Públicos (`PUBLIC_TCP_PORTS="80 443"`) |
+| 8000, 6001, 6002 | Panel, tiempo real y terminal web | Solo la IP de la tailnet (override del compose + ACL). No se abren a internet |
+
+## Diagnóstico: "Server is not reachable"
+
+Mira `sudo journalctl -u ssh -f` mientras pulsas *Check Again*:
+
+- `Connection refused` al conectar al host: `ufw` o `sshd` no escuchan para esa red. Comprueba la regla
+  `cigua: docker a host` en `ufw status` y que `docker_cidrs` coincida con la red del contenedor
+  (`docker network inspect coolify`).
+- `User coolify from 10.x.x.x not allowed`: el `Match` de `/etc/ssh/sshd_config.d/90-cigua-coolify.conf`
+  no exime el rango del contenedor. Revisa `default-address-pools` y vuelve a correr `sudo ./bootstrap.sh coolify`.
+- `Connection closed by authenticating user root`: el servidor localhost del panel sigue con usuario
+  `root`. En el panel (Servidores → localhost) cámbialo a `coolify` y valida.
+- `Failed publickey` o `no matching key`: la llave del panel ("Current Public Key") no está en
+  `~coolify/.ssh/authorized_keys`. El módulo avisa si el archivo no tiene ninguna llave.
+
 ## Supuestos a confirmar
 
 - El servicio realtime se llama `soketi` en el compose de Coolify.
 - El instalador lanzado como usuario no root coloca la llave de Coolify en `~coolify/.ssh/authorized_keys`. Si no, añádela a mano y registra el servidor con el usuario `coolify` en el panel.
-- El contenedor entra al host por la red `172.16.0.0/12`. Si Coolify no valida el servidor
-  localhost, revisa con `journalctl -u ssh` desde qué IP llega.
+- El contenedor entra al host desde los rangos de `default-address-pools` de `/etc/docker/daemon.json`
+  (o `172.16.0.0/12` si no hay): `docker_cidrs` en `lib/common.sh` es la única fuente, y de ella salen el
+  `Match` de sshd y las reglas de ufw. Si Coolify no valida el servidor localhost, mira el diagnóstico.
 - El instalador no permite fijar versión; el módulo muestra su sha256 al descargarlo.
 
 ## Riesgo que queda
