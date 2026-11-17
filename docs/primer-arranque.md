@@ -1,6 +1,6 @@
 # Primer arranque
 
-Orden para un VPS nuevo (Ubuntu 24.04). Asume `VPS_HOSTNAME=cigua` y `VPS_USER=savaf`.
+Orden para un VPS nuevo (Ubuntu 24.04). Asume `VPS_HOSTNAME=cigua` y `VPS_USER=cigua`.
 
 ## 0. Antes de tocar el VPS
 
@@ -28,7 +28,7 @@ cp host.env.example host.env && nano host.env
 sudo ./bootstrap.sh base swap user tailscale ssh firewall
 ```
 
-- `user` te pide la contraseña nueva de `savaf` (la usa sudo).
+- `user` te pide la contraseña nueva de `cigua` (la usa sudo).
 - `tailscale` imprime una URL de login, o usa `TS_AUTHKEY`.
 - `firewall` deja el 22 público abierto porque entraste desde fuera. Es lo esperado.
 - `ssh` cierra el login de root para conexiones nuevas; tu sesión actual sigue abierta.
@@ -36,7 +36,7 @@ sudo ./bootstrap.sh base swap user tailscale ssh firewall
 Si clonaste como root, pásale el repo al usuario antes de seguir:
 
 ```bash
-sudo mv /root/cigua /home/savaf/ && sudo chown -R savaf: /home/savaf/cigua
+sudo mv /root/cigua /home/cigua/ && sudo chown -R cigua: /home/cigua/cigua
 ```
 
 ## 3. Pasar a la tailnet
@@ -44,14 +44,14 @@ sudo mv /root/cigua /home/savaf/ && sudo chown -R savaf: /home/savaf/cigua
 Desde Songbird o ANDREA:
 
 ```bash
-ssh -t savaf@cigua 'cd ~/cigua && sudo ./bootstrap.sh firewall'
+ssh -t cigua@cigua 'cd ~/cigua && sudo ./bootstrap.sh firewall'
 ```
 
 Ahora sí cierra el SSH público. Comprueba en una terminal nueva antes de cerrar la vieja:
 
 ```bash
-ssh savaf@cigua hostname        # por Tailscale: responde
-ssh savaf@<ip-publica> hostname # debe fallar (timeout)
+ssh cigua@cigua hostname        # por Tailscale: responde
+ssh cigua@<ip-publica> hostname # debe fallar (timeout)
 ```
 
 ## 4. Dotfiles y llave

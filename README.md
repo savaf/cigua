@@ -24,7 +24,22 @@ El bootstrap de `cigua` llama al de `dotfiles` (módulo `dotfiles`). Nada de she
 - ANDREA y Songbird son clientes: `herdr --remote cigua`.
 - El SSH solo escucha por la tailnet. El VPS no puede iniciar conexiones hacia las PCs (ver `tailscale/policy.hujson`).
 
-## Uso
+## Instalación de una línea
+
+En un Ubuntu nuevo (el repo debe ser público para que funcione la URL):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/savaf/cigua/main/install.sh \
+  | sudo bash
+```
+
+- `VPS_USER` por defecto es `cigua` (pásala para otro). `AUTHORIZED_KEYS_URLS` por defecto usa las llaves de `savaf/dotfiles` (andrea y songbird); pásala para usar otras.
+- Opcionales: `VPS_HOSTNAME`, `TIMEZONE`, `SWAP_GB`, `PUBLIC_TCP_PORTS`, `COOLIFY=1`, `CIGUA_REF` (rama, tag o commit para fijar versión).
+- Secretos solo por entorno: `TS_AUTHKEY`, `COOLIFY_ADMIN_EMAIL`, `COOLIFY_ADMIN_PASSWORD`. Nunca se escriben a disco.
+- Es idempotente: volver a correrlo actualiza el repo y reaplica los módulos.
+- Cuidado con `curl | bash`: léelo antes (`curl -fsSL <url> | less`) y fija `CIGUA_REF` a un commit que hayas revisado.
+
+## Uso (manual)
 
 ```bash
 git clone <este repo> ~/cigua && cd ~/cigua
@@ -48,6 +63,8 @@ En orden. Todos son idempotentes.
 | `tailscale` | Une el VPS con `tag:server` y `--accept-dns=false` |
 | `ssh` | Drop-in de sshd: solo llaves, sin root. No actúa si `VPS_USER` no tiene llaves |
 | `firewall` | ufw: SSH solo por `tailscale0`. Guarda anti-bloqueo: no cierra el 22 público si entraste desde fuera de la tailnet |
+| `hardening` | sysctl de red y kernel, fail2ban en sshd (la tailnet nunca se banea) |
+| `coolify` | Solo con `COOLIFY=1`: instala Coolify con panel y realtime solo por la tailnet. Ver [docs/coolify.md](docs/coolify.md) |
 | `dotfiles` | Clona `savaf/dotfiles` y corre su bootstrap como `VPS_USER` |
 | `git-key` | Llave SSH propia del VPS + ssh-agent de usuario; te dice qué commitear en dotfiles |
 | `claude-managed` | Hook de avisos a ntfy en `/etc/claude-code/managed-settings.d/`, solo en este VPS |

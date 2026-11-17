@@ -13,7 +13,7 @@ source "${ROOT_DIR}/lib/common.sh"
 
 # Orden importa: el usuario antes que ssh (que cierra el login de root), Tailscale antes
 # que el firewall (que deja el SSH solo en la tailnet), git-key antes que agents (clona por SSH).
-MODULES=(base swap user tailscale ssh firewall dotfiles git-key claude-managed agents)
+MODULES=(base swap user tailscale ssh firewall hardening coolify dotfiles git-key claude-managed agents)
 
 describe() {
   case "$1" in
@@ -23,6 +23,8 @@ describe() {
     tailscale)      echo "unir el VPS a la tailnet con tag:server" ;;
     ssh)            echo "endurecer sshd: sin contraseñas ni root" ;;
     firewall)       echo "ufw: SSH solo por tailscale0 (con guarda anti-bloqueo)" ;;
+    hardening)      echo "sysctl y fail2ban (tailnet exenta)" ;;
+    coolify)        echo "Coolify en este VPS, solo con COOLIFY=1 (panel solo por la tailnet)" ;;
     dotfiles)       echo "clonar savaf/dotfiles y correr su bootstrap (shell, Claude, herdr)" ;;
     git-key)        echo "llave SSH de la máquina + ssh-agent de usuario" ;;
     claude-managed) echo "hooks de Claude solo de este VPS (avisos a ntfy)" ;;
