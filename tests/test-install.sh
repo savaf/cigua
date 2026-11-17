@@ -33,4 +33,11 @@ res="$(env -i PATH="${PATH}" bash -c 'source "$0"; echo "${AUTHORIZED_KEYS_URLS}
 check "la última asignación gana: solo las llaves pedidas" test "$(grep -c 'x.test' <<<"${res}")" = 2
 refute "no hereda llaves de otro del ejemplo" grep -q 'dotfiles' <<<"${res}"
 
+pub="${work}/cigua_ed25519.pub"
+check "sin llave: show_pubkey no imprime ni falla" test -z "$(show_pubkey "${pub}")"
+echo "ssh-ed25519 AAAAtest cigua" >"${pub}"
+res="$(show_pubkey "${pub}")"
+check "imprime la pública" grep -q 'ssh-ed25519 AAAAtest cigua' <<<"${res}"
+check "sugiere ssh/.ssh/cigua.pub" grep -q 'ssh/.ssh/cigua.pub' <<<"${res}"
+
 finish

@@ -86,6 +86,14 @@ fetch_repo() {
   say "versión: $(git -C "${CIGUA_DIR}" rev-parse --short HEAD)"
 }
 
+# Reimprime la llave pública del VPS al final: el módulo git-key ya la generó, pero su
+# mensaje queda enterrado en la salida del bootstrap. Uso: show_pubkey <archivo.pub>
+show_pubkey() {
+  [[ -r "$1" ]] || return 0
+  printf '\n[install] Llave pública del VPS (guárdala en dotfiles como ssh/.ssh/%s.pub):\n\n  %s\n' \
+    "$(basename "$1" _ed25519.pub)" "$(cat "$1")"
+}
+
 main() {
   [[ "${EUID}" -eq 0 ]] || fail "corre como root: curl … | sudo bash"
   command -v apt-get >/dev/null || fail "pensado para Ubuntu/Debian"
@@ -108,6 +116,8 @@ main() {
 
   cd "${CIGUA_DIR}"
   ./bootstrap.sh
+
+  show_pubkey "$(getent passwd "${VPS_USER}" | cut -d: -f6)/.ssh/${VPS_HOSTNAME}_ed25519.pub"
 
   cat <<EOF
 
