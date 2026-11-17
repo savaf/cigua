@@ -16,7 +16,7 @@ Todo el SSH (y por tanto herdr) pasa por ella.
 | Desde | Hacia | Permitido |
 |---|---|---|
 | Tus dispositivos | Tus dispositivos | Todo (SSH, Taildrop) |
-| Tus dispositivos | `cigua` | Puerto 22 (SSH) y 8000, 6001, 6002 (panel de Coolify, si lo instalas) |
+| Tus dispositivos | `cigua` | Puerto 22 (SSH) y 8000 (panel de Coolify, si lo instalas) |
 | `cigua` | Cualquiera | Nada |
 
 Si el VPS cae en manos de otro, no tiene camino a tus PCs.

@@ -3,7 +3,8 @@
 # Riesgo asumido: Coolify controla Docker, o sea root efectivo en la máquina. Por eso:
 #  - corre bajo su propio usuario (COOLIFY_USER, por defecto "coolify"), distinto de VPS_USER:
 #    los agentes no comparten usuario, home ni llaves con Coolify;
-#  - panel (8000) y realtime (6001/6002) publicados SOLO en la IP de la tailnet;
+#  - panel (8000) publicado SOLO en la IP de la tailnet; realtime y terminal (6001/6002) no se
+#    publican en el host: van por el proxy cuando la instancia tiene dominio (COOLIFY_DOMAIN);
 #  - 80/443 los abre PUBLIC_TCP_PORTS (proxy de Coolify), nada más;
 #  - VPS_USER nunca entra al grupo docker (módulo user);
 #  - root sigue sin poder entrar por SSH; ese usuario solo entra desde localhost y Docker;
@@ -43,6 +44,27 @@ install_coolify_sshd() {
   systemctl try-reload-or-restart ssh 2>/dev/null || systemctl try-reload-or-restart sshd
 }
 
+# ¿Quién escucha en el puerto $1 (TCP)? Imprime el nombre del proceso (o "proceso desconocido") y
+# sale 0 si hay alguien; sale 1 si está libre. Sirve para parar antes de instalar el proxy.
+port_in_use_by() {
+  local line proc
+  line="$(ss -ltnpH "sport = :$1" 2>/dev/null | head -n1 || true)"
+  [[ -n "${line}" ]] || return 1
+  proc="$(grep -o 'users:(("[^"]*"' <<<"${line}" | head -n1 | sed 's/users:(("//; s/"$//' || true)"
+  echo "${proc:-proceso desconocido}"
+}
+
+# El proxy de Coolify (Traefik) necesita el 80 y el 443 libres: si no, el instalador falla con un
+# "Port 80 is in use" poco claro. Se para antes y se dice quién los tiene.
+check_proxy_ports_free() {
+  local port who
+  for port in 80 443; do
+    if who="$(port_in_use_by "${port}")"; then
+      die "el puerto ${port} está en uso por ${who}: páralo (p. ej. sudo systemctl disable --now ${who}) y repite"
+    fi
+  done
+}
+
 # Los contenedores entran al host por SSH (Coolify valida su servidor localhost): se permite
 # desde los rangos de Docker aunque el 22 público esté cerrado. No lleva el comentario
 # "cigua: público", así que el firewall no la concilia ni la borra.
@@ -62,6 +84,13 @@ coolify_post_checks() {
   home="$(getent passwd "$1" | cut -d: -f6)"
   coolify_has_key "${home}/.ssh/authorized_keys" \
     || warn "${home}/.ssh/authorized_keys no tiene la llave pública del panel: cópiala desde Servidores → localhost → Current Public Key"
+  if [[ -n "${COOLIFY_DOMAIN:-}" ]]; then
+    if [[ "${COOLIFY_DOMAIN}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+      log "Dominio ${COOLIFY_DOMAIN}: crea un registro A hacia la IP pública del VPS y luego pon https://${COOLIFY_DOMAIN} en Settings → Instance's Domain"
+    else
+      warn "COOLIFY_DOMAIN no parece un dominio válido; lo ignoro"
+    fi
+  fi
   warn "El instalador de Coolify crea el servidor localhost con usuario root: en el panel (Servidores → localhost) cámbialo a $1 y pulsa Validate."
 }
 
@@ -122,6 +151,8 @@ run_coolify() {
     return
   fi
 
+  check_proxy_ports_free
+
   local script
   script="$(mktemp)"
   curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o "${script}"
@@ -138,6 +169,6 @@ run_coolify() {
 
   # Coolify opera Docker como este usuario; el grupo existe una vez instalado Docker.
   if getent group docker >/dev/null; then usermod -aG docker "${COOLIFY_USER}"; fi
-  log "panel en http://${ip}:8000 (solo por la tailnet). Revisa: ss -tlnp | grep -E ':(8000|6001|6002)'"
+  log "panel en http://${ip}:8000 (solo por la tailnet). Revisa: ss -tlnp | grep ':8000'"
   coolify_post_checks "${COOLIFY_USER}"
 }

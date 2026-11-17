@@ -5,8 +5,10 @@ Coolify controla Docker: equivale a root en la máquina. Por eso se instala con 
 ## Qué hace el módulo
 
 - Solo con `COOLIFY=1` en el archivo de config del host. Si no, se omite.
-- Panel (8000) y realtime (6001, 6002) **solo en la IP de la tailnet**, con un
-  `docker-compose.custom.yml` escrito antes de instalar. Docker se salta ufw, por eso no basta el firewall.
+- Panel (8000) **solo en la IP de la tailnet**, con un `docker-compose.custom.yml` escrito antes de
+  instalar. Docker se salta ufw, por eso no basta el firewall. El realtime y la terminal web
+  (6001, 6002) **no se publican en el host**: se sirven por el proxy cuando hay dominio.
+- Antes de instalar comprueba que el 80 y el 443 estén libres; si no, se detiene y dice qué proceso los tiene.
 - 80 y 443 (proxy) por `PUBLIC_TCP_PORTS="80 443"`. Nada más público.
 - Corre bajo su propio usuario, `coolify` (`COOLIFY_USER`), distinto de `VPS_USER`: los agentes
   no comparten usuario, home ni llaves con Coolify. Sin contraseña, solo entra por llave, con
@@ -35,10 +37,20 @@ los puertos 8000, 6001 y 6002 hacia `tag:server`; si usas una política antigua,
 ## Verificar (tras instalar)
 
 ```bash
-ss -tlnp | grep -E ':(8000|6001|6002)'   # solo la IP 100.x, nunca 0.0.0.0
+ss -tlnp | grep ':8000'   # solo la IP 100.x, nunca 0.0.0.0
+ss -tlnp | grep -E ':(6001|6002)'   # no debe salir nada
 ```
 
 Desde fuera de la tailnet, `curl http://<ip-publica>:8000` debe fallar.
+
+## Dominio (opcional)
+
+Con `COOLIFY_DOMAIN` (o la pregunta del instalador) el módulo recuerda los pasos, no los hace solo:
+
+1. Crea un registro A del dominio hacia la IP pública del VPS.
+2. En el panel: Settings → Instance's Domain → `https://<dominio>`.
+
+Con dominio, el realtime y la terminal web (6001, 6002) llegan por el proxy en 443, sin abrir puertos.
 
 ## Puertos
 
@@ -46,7 +58,15 @@ Desde fuera de la tailnet, `curl http://<ip-publica>:8000` debe fallar.
 |---|---|---|
 | 22 | SSH y validación del servidor localhost | `SSH_PUBLIC` (por defecto abierto) y los rangos de Docker (regla `cigua: docker a host`) |
 | 80, 443 | Proxy y certificados | Públicos (`PUBLIC_TCP_PORTS="80 443"`) |
-| 8000, 6001, 6002 | Panel, tiempo real y terminal web | Solo la IP de la tailnet (override del compose + ACL). No se abren a internet |
+| 8000 | Panel (configuración inicial) | Solo la IP de la tailnet (override del compose + ACL). No se abre a internet |
+| 6001, 6002 | Tiempo real y terminal web | No se publican en el host; van por el proxy cuando hay dominio |
+
+## Diagnóstico: "Port 80 is in use"
+
+Algo más escucha en el 80 (en tu caso, nginx instalado por los dotfiles). El módulo lo detecta antes de
+instalar y nombra el proceso. Páralo (`sudo systemctl disable --now nginx`) y repite. Si el error aparece
+ya con Coolify instalado, mira `sudo ss -ltnp | grep -E ':(80|443) '` y `sudo docker ps`: el proxy de Coolify
+(Traefik) debe ser quien los tiene, y en el panel (Servers → localhost → Proxy) debe estar en *Running*.
 
 ## Diagnóstico: "Server is not reachable"
 

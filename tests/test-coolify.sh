@@ -40,7 +40,10 @@ refute "falla antes de descargar nada" test -s "${CALLS}"
 
 out="$(render_coolify_compose 100.101.1.2)"
 check "override: panel en la IP de la tailnet" grep -q '"100.101.1.2:8000:8080"' <<<"${out}"
-check "override: realtime en la IP de la tailnet" grep -q '"100.101.1.2:6001:6001"' <<<"${out}"
+check "override: el panel solo en la IP de la tailnet" grep -q '"100.101.1.2:8000:8080"' <<<"${out}"
+refute "override: el realtime (6001) no se publica en el host" grep -q '6001' <<<"$(grep -v '^ *#' <<<"${out}")"
+refute "override: la terminal (6002) no se publica en el host" grep -q '6002' <<<"$(grep -v '^ *#' <<<"${out}")"
+check "override: vacía los puertos de soketi" grep -q 'ports: !override \[\]' <<<"${out}"
 refute "override: nada en 0.0.0.0" grep -q '0\.0\.0\.0' <<<"$(grep -v '^ *#' <<<"${out}")"
 refute "override: sin marcador sin sustituir" grep -q '__TAILNET_IP__' <<<"${out}"
 
@@ -88,7 +91,9 @@ export COOLIFY_SSHD_DROPIN="${work}/etc/90-cigua-coolify.conf" ROOT_DIR
 printf '#!/bin/sh\nexit 0\n' >"${work}/bin/sshd"
 printf '#!/bin/sh\necho "$@" >>"%s/systemctl.log"\n' "${work}" >"${work}/bin/systemctl"
 chmod +x "${work}/bin/sshd" "${work}/bin/systemctl"
+# shellcheck disable=SC2329 # las usa install_coolify_sshd; más abajo se redefinen para capturar
 log() { :; }
+# shellcheck disable=SC2329
 warn() { :; }
 quiet() { ( "$@" ) >/dev/null 2>&1; }   # subshell: un die (exit) no mata el test
 die() { echo "DIE: $*" >&2; exit 1; }
@@ -120,5 +125,37 @@ check "con llave pública: cierto" coolify_has_key "${work}/ak"
 printf '# solo un comentario\n' >"${work}/ak"
 refute "solo comentarios: falso" coolify_has_key "${work}/ak"
 refute "archivo ausente: falso" coolify_has_key "${work}/no-existe"
+
+echo "puertos del proxy"
+cat >"${work}/bin/ss" <<'EOF'
+#!/bin/sh
+# El último argumento es el filtro "sport = :N".
+for last; do :; done
+case "${last}" in
+  *:80) [ -n "${LISTEN80-}" ] && echo "${LISTEN80}" ;;
+  *:443) [ -n "${LISTEN443-}" ] && echo "${LISTEN443}" ;;
+esac
+exit 0
+EOF
+chmod +x "${work}/bin/ss"
+refute "puerto libre: port_in_use_by sale 1" port_in_use_by 80
+check "nginx en el 80: lo nombra" test "$(LISTEN80='LISTEN 0 511 0.0.0.0:80 0.0.0.0:* users:(("nginx",pid=1,fd=5))' port_in_use_by 80)" = nginx
+check "escucha sin datos de proceso: 'proceso desconocido'" test "$(LISTEN80='LISTEN 0 4096 0.0.0.0:80 0.0.0.0:*' port_in_use_by 80)" = "proceso desconocido"
+check "puertos libres: check_proxy_ports_free no falla" quiet check_proxy_ports_free
+refute "80 ocupado: check_proxy_ports_free falla" env LISTEN80='LISTEN 0 1 *:80 *:* users:(("nginx",pid=1,fd=5))' bash -c "source '${ROOT_DIR}/lib/common.sh'; source '${ROOT_DIR}/modules/coolify.sh'; die() { exit 1; }; check_proxy_ports_free" 
+msg="$(LISTEN443='LISTEN 0 1 *:443 *:* users:(("caddy",pid=2,fd=6))' bash -c "source '${ROOT_DIR}/lib/common.sh'; source '${ROOT_DIR}/modules/coolify.sh'; check_proxy_ports_free" 2>&1 || true)"
+check "443 ocupado: el mensaje nombra el puerto y el proceso" bash -c "grep -q '443' <<<'${msg}' && grep -q 'caddy' <<<'${msg}'"
+
+echo "dominio"
+warns=""
+warn() { warns+="$*"$'\n'; }
+log() { warns+="$*"$'\n'; }
+getent() { echo "coolify:x:1:1::${work}/home:/bin/bash"; }
+COOLIFY_DOMAIN="savaf.cloud" coolify_post_checks coolify
+check "con COOLIFY_DOMAIN: recuerda el registro A y Instance's Domain" grep -q "registro A.*https://savaf.cloud" <<<"${warns}"
+warns=""
+COOLIFY_DOMAIN='x; reboot' coolify_post_checks coolify
+check "dominio inválido: se ignora con aviso" grep -q 'no parece un dominio' <<<"${warns}"
+refute "dominio inválido: no lo imprime como instrucción" grep -q 'Instance' <<<"$(grep -v 'ignoro' <<<"${warns}" | grep 'reboot')"
 
 finish

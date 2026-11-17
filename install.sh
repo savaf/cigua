@@ -13,7 +13,7 @@ set -euo pipefail
 #   VPS_USER              usuario de trabajo (por defecto: cigua).
 #   AUTHORIZED_KEYS_URLS  URLs de llaves públicas, separadas por espacio. Por defecto, las
 #                         llaves de savaf/dotfiles (andrea y songbird).
-#   VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS
+#   VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY COOLIFY_DOMAIN NTFY_URL DOTFILES_REPO TAILSCALE_TAGS
 #   CIGUA_REPO (por defecto este repo) · CIGUA_REF (rama, tag o commit) · CIGUA_DIR (/opt/cigua)
 # Coolify: COOLIFY=1 (o responde "s" a la pregunta) lo instala; entonces pide COOLIFY_ADMIN_EMAIL y
 #   COOLIFY_ADMIN_PASSWORD y abre 80/443. Todas las preguntas tienen defecto: Enter las acepta.
@@ -70,11 +70,12 @@ setup_coolify() {
   [[ "${COOLIFY}" == 1 ]] || return 0
   PUBLIC_TCP_PORTS="${PUBLIC_TCP_PORTS:-80 443}"
   ask COOLIFY_ADMIN_EMAIL "Correo del admin de Coolify"
+  ask COOLIFY_DOMAIN "Dominio de Coolify (opcional, Enter para omitir)"
   ask_secret COOLIFY_ADMIN_PASSWORD "Contraseña del admin de Coolify (mín. 8, no se muestra)"
   [[ -n "${COOLIFY_ADMIN_EMAIL}" && -n "${COOLIFY_ADMIN_PASSWORD}" ]] \
     || fail "COOLIFY=1 necesita COOLIFY_ADMIN_EMAIL y COOLIFY_ADMIN_PASSWORD (por entorno si no hay terminal)"
   (( ${#COOLIFY_ADMIN_PASSWORD} >= 8 )) || fail "la contraseña del admin de Coolify debe tener al menos 8 caracteres"
-  export PUBLIC_TCP_PORTS COOLIFY_ADMIN_EMAIL COOLIFY_ADMIN_PASSWORD
+  export PUBLIC_TCP_PORTS COOLIFY_DOMAIN COOLIFY_ADMIN_EMAIL COOLIFY_ADMIN_PASSWORD
 }
 
 # Los valores acaban en un archivo que se carga con source: solo caracteres inocuos.
@@ -91,7 +92,7 @@ render_host_env() {
   done
 
   # Todo se valida antes de abrir el destino: un fallo no deja un host.env a medias.
-  local names=(VPS_USER VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS)
+  local names=(VPS_USER VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY COOLIFY_DOMAIN NTFY_URL DOTFILES_REPO TAILSCALE_TAGS)
   for name in "${names[@]}"; do
     safe_value "${!name:-}" || fail "valor no permitido en ${name}"
   done
