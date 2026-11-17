@@ -15,6 +15,8 @@ set -euo pipefail
 #                         llaves de savaf/dotfiles (andrea y songbird).
 #   VPS_HOSTNAME TIMEZONE SWAP_GB PUBLIC_TCP_PORTS COOLIFY NTFY_URL DOTFILES_REPO TAILSCALE_TAGS
 #   CIGUA_REPO (por defecto este repo) · CIGUA_REF (rama, tag o commit) · CIGUA_DIR (/opt/cigua)
+# Coolify: COOLIFY=1 (o responde "s" a la pregunta) lo instala; entonces pide COOLIFY_ADMIN_EMAIL y
+#   COOLIFY_ADMIN_PASSWORD y abre 80/443. Todas las preguntas tienen defecto: Enter las acepta.
 # Secretos, solo por entorno y nunca a disco: TS_AUTHKEY, COOLIFY_ADMIN_EMAIL, COOLIFY_ADMIN_PASSWORD.
 
 CIGUA_REPO="${CIGUA_REPO:-https://github.com/savaf/cigua.git}"
@@ -36,6 +38,43 @@ ask() {
     read -r -p "${prompt}${default:+ [${default}]}: " value </dev/tty || true
   fi
   printf -v "${name}" '%s' "${value:-${default}}"
+}
+
+# Sí/no por entorno (1, s, si, y, yes, true) o, con terminal, por pregunta. Deja 1 o 0 en $1.
+# $1 nombre, $2 pregunta, $3 defecto (s|n).
+ask_yes_no() {
+  local name="$1" prompt="$2" default="${3:-n}" value="${!1:-}" hint="s/N"
+  [[ "${default}" == s ]] && hint="S/n"
+  if [[ -z "${value}" ]] && have_tty; then
+    read -r -p "${prompt} [${hint}]: " value </dev/tty || true
+  fi
+  value="${value:-${default}}"
+  case "${value,,}" in s|si|sí|y|yes|1|true) printf -v "${name}" 1 ;; *) printf -v "${name}" 0 ;; esac
+}
+
+# Secreto por entorno o, con terminal, escrito sin eco. Nunca va a disco.
+ask_secret() {
+  local name="$1" prompt="$2" value="${!1:-}"
+  if [[ -z "${value}" ]] && have_tty; then
+    read -r -s -p "${prompt}: " value </dev/tty || true
+    echo >/dev/tty
+  fi
+  printf -v "${name}" '%s' "${value}"
+}
+
+# Pregunta si instalar Coolify. Si sí: abre 80/443 y pide el admin (solo por entorno, no a disco),
+# porque sin admin el primer registro en el panel sería el dueño.
+setup_coolify() {
+  ask_yes_no COOLIFY "¿Instalar Coolify en este VPS? (panel solo por la tailnet)" n
+  export COOLIFY
+  [[ "${COOLIFY}" == 1 ]] || return 0
+  PUBLIC_TCP_PORTS="${PUBLIC_TCP_PORTS:-80 443}"
+  ask COOLIFY_ADMIN_EMAIL "Correo del admin de Coolify"
+  ask_secret COOLIFY_ADMIN_PASSWORD "Contraseña del admin de Coolify (mín. 8, no se muestra)"
+  [[ -n "${COOLIFY_ADMIN_EMAIL}" && -n "${COOLIFY_ADMIN_PASSWORD}" ]] \
+    || fail "COOLIFY=1 necesita COOLIFY_ADMIN_EMAIL y COOLIFY_ADMIN_PASSWORD (por entorno si no hay terminal)"
+  (( ${#COOLIFY_ADMIN_PASSWORD} >= 8 )) || fail "la contraseña del admin de Coolify debe tener al menos 8 caracteres"
+  export PUBLIC_TCP_PORTS COOLIFY_ADMIN_EMAIL COOLIFY_ADMIN_PASSWORD
 }
 
 # Los valores acaban en un archivo que se carga con source: solo caracteres inocuos.
@@ -114,13 +153,16 @@ main() {
     say "host.env ya existe: uso su usuario y hostname (bórralo para regenerarlo)"
     VPS_USER="$(host_env_value "${CIGUA_DIR}/host.env" VPS_USER)"
     VPS_HOSTNAME="$(host_env_value "${CIGUA_DIR}/host.env" VPS_HOSTNAME)"
+    COOLIFY="${COOLIFY:-$(host_env_value "${CIGUA_DIR}/host.env" COOLIFY)}"
     [[ -n "${VPS_USER}" && -n "${VPS_HOSTNAME}" ]] || fail "host.env no define VPS_USER y VPS_HOSTNAME"
     export VPS_USER VPS_HOSTNAME
+    setup_coolify
   else
     ask VPS_USER "Usuario de trabajo" cigua
     ask AUTHORIZED_KEYS_URLS "URLs de llaves públicas (https, separadas por espacio)" "${DEFAULT_KEYS}"
     ask VPS_HOSTNAME "Hostname" cigua
     export VPS_USER AUTHORIZED_KEYS_URLS VPS_HOSTNAME
+    setup_coolify
   fi
 
   DEBIAN_FRONTEND=noninteractive apt-get update -qq
