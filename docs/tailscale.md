@@ -16,11 +16,12 @@ Todo el SSH (y por tanto herdr) pasa por ella.
 | Desde | Hacia | Permitido |
 |---|---|---|
 | Tus dispositivos | Tus dispositivos | Todo (SSH, Taildrop) |
-| Tus dispositivos | `cigua` | Solo puerto 22 |
+| Tus dispositivos | `cigua` | Puerto 22 (SSH) y 8000, 6001, 6002 (panel de Coolify, si lo instalas) |
 | `cigua` | Cualquiera | Nada |
 
 Si el VPS cae en manos de otro, no tiene camino a tus PCs.
 Para exponer algo más del VPS por la tailnet (un relay, una web interna), añade su puerto a la segunda regla.
+Si cambias la política, vuelve a pegarla en la consola de Tailscale.
 
 ## Si falla con `requested tags [tag:server] are invalid or not permitted`
 

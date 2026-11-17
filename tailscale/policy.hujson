@@ -10,9 +10,10 @@
     // Tus dispositivos (ANDREA, Songbird, el teléfono) se hablan entre sí: SSH, Taildrop.
     {"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]},
 
-    // y entran al VPS solo por SSH.
+    // y entran al VPS por SSH y, si instalas Coolify, a su panel (8000) y a su realtime (6001, 6002:
+    // eventos en vivo y terminal; el navegador se conecta directo a esos puertos).
     // Si expones algo más por la tailnet (un relay, una web interna), añade su puerto aquí.
-    {"action": "accept", "src": ["autogroup:member"], "dst": ["tag:server:22"]},
+    {"action": "accept", "src": ["autogroup:member"], "dst": ["tag:server:22", "tag:server:8000", "tag:server:6001", "tag:server:6002"]},
 
     // Lo que NO hay: ninguna regla con src tag:server. El VPS no puede abrir conexiones
     // hacia tus PCs; si un agente o un paquete lo compromete, no tiene camino a ellas.
