@@ -48,12 +48,15 @@ main() {
     [[ -f "${ROOT_DIR}/modules/${m}.sh" ]] || die "módulo desconocido: ${m} (ver --list)"
   done
 
+  local n=0 total=${#selected[@]}
   for m in "${selected[@]}"; do
-    log "── ${m}: $(describe "${m}")"
+    n=$((n + 1))
+    log "── [${n}/${total}] ${m}: $(describe "${m}")"
     # Cada módulo define run_<nombre con _> y nada más.
     source "${ROOT_DIR}/modules/${m}.sh"
     "run_${m//-/_}"
   done
+  [[ -e /var/run/reboot-required ]] && warn "Ubuntu pide reiniciar (kernel o libc nuevos). Hazlo cuando no haya agentes corriendo: sudo reboot"
   log "Listo."
 }
 

@@ -115,6 +115,8 @@ main() {
   fi
 
   cd "${CIGUA_DIR}"
+  # Con `curl | bash` stdin es el pipe: passwd y sudo (dotfiles) necesitan la terminal.
+  [[ -r /dev/tty ]] && exec </dev/tty
   ./bootstrap.sh
 
   show_pubkey "$(getent passwd "${VPS_USER}" | cut -d: -f6)/.ssh/${VPS_HOSTNAME}_ed25519.pub"
