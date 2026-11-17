@@ -22,6 +22,9 @@ load_host_env() {
   : "${VPS_USER:?VPS_USER vacío en host.env}"
 }
 
+# ¿El usuario tiene contraseña usable? (passwd -S: segundo campo P = sí, L = bloqueada, NP = vacía)
+has_password() { [[ "$(passwd -S "$1" 2>/dev/null | awk '{print $2}')" == P ]]; }
+
 # Home y uid del usuario de trabajo (vacíos si aún no existe).
 user_home() { getent passwd "${VPS_USER}" | cut -d: -f6; }
 user_uid()  { id -u "${VPS_USER}" 2>/dev/null; }

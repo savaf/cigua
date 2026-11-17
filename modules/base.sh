@@ -4,6 +4,10 @@
 BASE_PACKAGES=(git curl jq ufw ca-certificates unattended-upgrades)
 
 run_base() {
+  # Parches antes que nada. force-confold conserva tus configs; sin preguntas ni reinicio.
+  log "apt: actualizando Ubuntu (puede tardar unos minutos)"
+  DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Options::=--force-confold upgrade
   log "apt: actualizando índices e instalando ${BASE_PACKAGES[*]}"
   DEBIAN_FRONTEND=noninteractive apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${BASE_PACKAGES[@]}"

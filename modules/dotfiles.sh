@@ -19,6 +19,7 @@ run_dotfiles() {
     warn "Normal en el primer arranque: el módulo git-key la genera y te dice qué commitear."
   fi
 
+  has_password "${VPS_USER}" || die "${VPS_USER} no tiene contraseña y el bootstrap de dotfiles pide sudo: passwd ${VPS_USER}"
   log "corriendo el bootstrap de dotfiles (pedirá la contraseña de ${VPS_USER} para sudo)"
   as_user bash -c "cd '${dir}' && ./scripts/bootstrap.sh"
 }

@@ -3,8 +3,18 @@
 
 run_user() {
   if ! id "${VPS_USER}" >/dev/null 2>&1; then
-    log "creando usuario ${VPS_USER} (te pedirá contraseña: la usa sudo)"
-    adduser --gecos "" "${VPS_USER}"
+    log "creando usuario ${VPS_USER}"
+    adduser --disabled-password --gecos "" "${VPS_USER}"
+  fi
+  # La contraseña la usa sudo (y el bootstrap de dotfiles). Se lee de la terminal, no de
+  # stdin: con `curl | bash` stdin es el pipe y passwd aborta sin contraseña.
+  if ! has_password "${VPS_USER}"; then
+    if [[ -r /dev/tty ]]; then
+      log "elige la contraseña de ${VPS_USER} (la pide sudo)"
+      until has_password "${VPS_USER}"; do passwd "${VPS_USER}" </dev/tty || true; done
+    else
+      die "${VPS_USER} no tiene contraseña y no hay terminal: corre 'passwd ${VPS_USER}' y repite"
+    fi
   fi
   usermod -aG sudo "${VPS_USER}"
 
