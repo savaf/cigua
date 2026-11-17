@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-shell_files=(bootstrap.sh lib/*.sh modules/*.sh scripts/*.sh tests/*.sh files/bin/*)
+shell_files=(bootstrap.sh install.sh lib/*.sh modules/*.sh scripts/*.sh tests/*.sh files/bin/*)
 
 echo "== bash -n"
 for f in "${shell_files[@]}"; do bash -n "${f}"; done

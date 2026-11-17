@@ -28,7 +28,7 @@ En `ssh/.ssh/config` de tus dotfiles:
 
 ```
 Host cigua andrea songbird
-    User savaf
+    User cigua
     IdentityFile ~/.ssh/github.pub
     IdentitiesOnly yes
     ServerAliveInterval 30
